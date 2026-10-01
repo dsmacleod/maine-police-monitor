@@ -1,0 +1,62 @@
+name: maine-police-monitor
+
+# One workflow for both jobs so they share (and never race on) state.json.
+#   poll:   every 30 minutes, sends urgent alerts and queues everything else
+#   digest: 11:00 and 19:00 UTC, which is 7 a.m./3 p.m. EDT (6 a.m./2 p.m. EST)
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+    - cron: "5 11,19 * * *"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "poll, digest, or check-pages"
+        default: poll
+
+concurrency:
+  group: maine-police-monitor
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # Persist state.json (seen post IDs, digest queue) between runs.
+      - name: Restore state
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: police-state-${{ github.run_id }}
+          restore-keys: police-state-
+
+      - name: Run
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CMD="${{ inputs.command }}"
+          elif [ "${{ github.event.schedule }}" = "5 11,19 * * *" ]; then
+            CMD=digest
+          else
+            CMD=poll
+          fi
+          python3 monitor.py "$CMD"
+
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: police-state-${{ github.run_id }}
