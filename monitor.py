@@ -19,7 +19,9 @@ Commands:
 Env vars (put them in a .env file; see .env.example):
   APIFY_TOKEN         Apify API token (required)
   ANTHROPIC_API_KEY   Claude API key (required for poll)
-  SLACK_WEBHOOK_URL   Slack incoming-webhook URL (required unless --dry-run)
+  SLACK_BOT_TOKEN     "Police Pages" bot token (xoxb-...), plus
+  SLACK_CHANNEL       channel ID or #name to post to
+  SLACK_WEBHOOK_URL   alternative to the bot token: an incoming-webhook URL
   FIRST_LOOKBACK_HOURS  How far back the very first poll looks (default 24)
   POSTS_PER_PAGE      Max posts fetched per page per poll (default 10)
 """
@@ -311,8 +313,18 @@ def post_to_slack(text, dry_run):
     if dry_run:
         print("----- SLACK (dry run) -----\n" + text + "\n---------------------------")
         return
-    data = json.dumps({"text": text, "unfurl_links": False, "unfurl_media": False}).encode()
-    req = urllib.request.Request(require("SLACK_WEBHOOK_URL"), data=data,
+    msg = {"text": text, "unfurl_links": False, "unfurl_media": False}
+    if cfg("SLACK_BOT_TOKEN"):
+        # "Police Pages" bot (see manifest.json). chat:write.public lets it post without joining the channel.
+        resp = http_json("https://slack.com/api/chat.postMessage", {**msg, "channel": require("SLACK_CHANNEL")},
+                         {"Authorization": f"Bearer {cfg('SLACK_BOT_TOKEN')}",
+                          "Content-Type": "application/json; charset=utf-8"}, timeout=20)
+        if not resp.get("ok"):
+            raise RuntimeError(f"Slack chat.postMessage failed: {resp.get('error')}")
+        return
+    if not cfg("SLACK_WEBHOOK_URL"):
+        sys.exit("Set SLACK_BOT_TOKEN + SLACK_CHANNEL (or SLACK_WEBHOOK_URL) in .env")
+    req = urllib.request.Request(cfg("SLACK_WEBHOOK_URL"), data=json.dumps(msg).encode(),
                                  headers={"Content-Type": "application/json", "User-Agent": USER_AGENT})
     urllib.request.urlopen(req, timeout=20)
 

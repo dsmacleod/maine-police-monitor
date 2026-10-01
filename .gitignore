@@ -3,3 +3,5 @@ state.json
 __pycache__/
 *.pyc
 .venv/
+.slack/apps*.json
+.slack/cache/

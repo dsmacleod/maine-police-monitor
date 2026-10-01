@@ -18,7 +18,7 @@ Every summary comes from the agency's own post. **Confirm with the agency before
 
 1. **Apify** ([Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper)) fetches only the posts made since the last poll from every page in `pages.json`. Apify, not our IP, deals with Facebook's login walls and blocking.
 2. **Claude** (`claude-opus-5-5`, low effort, structured output) triages them in batches. Apify also reads the text in images, which many agencies use for press releases. When a post has little text, Claude sees the first photo too.
-3. **Slack** gets the posts through an incoming webhook.
+3. **Slack** gets the posts from the **Police Pages** bot (app `A0C5XJRVB1T`, defined in `manifest.json`). It needs `SLACK_BOT_TOKEN` and `SLACK_CHANNEL`. An incoming-webhook URL (`SLACK_WEBHOOK_URL`) also works instead.
 4. **`state.json`** tracks seen post IDs (so nothing is announced twice) and the digest queue.
 
 ## Setup
@@ -28,7 +28,7 @@ Needs Python 3.10+ (the Anthropic SDK requires it; macOS's built-in `python3` is
 ```bash
 uv venv -p 3.11 .venv && uv pip install -p .venv -r requirements.txt
 source .venv/bin/activate                  # then `python3` below is the venv's 3.11
-cp .env.example .env                       # add APIFY_TOKEN, ANTHROPIC_API_KEY, SLACK_WEBHOOK_URL
+cp .env.example .env                       # add APIFY_TOKEN, ANTHROPIC_API_KEY, SLACK_BOT_TOKEN, SLACK_CHANNEL
 python3 monitor.py check-pages             # find dead or wrong page URLs (costs ~8¢)
 python3 monitor.py poll --dry-run          # one poll, prints what it would post
 python3 monitor.py digest --dry-run        # prints the digest
@@ -40,7 +40,7 @@ The starter list of 39 agencies uses **page URLs I guessed and haven't checked**
 
 ## Running it on a schedule
 
-`.github/workflows/monitor.yml` runs a **poll every 30 minutes** and a **digest at 11:00 and 19:00 UTC**. That's 7 a.m. and 3 p.m. during daylight time, or 6 a.m. and 2 p.m. in winter. Add three repo secrets: `APIFY_TOKEN`, `ANTHROPIC_API_KEY` and `SLACK_WEBHOOK_URL`. You can also run any command by hand from the Actions tab.
+`.github/workflows/monitor.yml` runs a **poll every 30 minutes** and a **digest at 11:00 and 19:00 UTC**. That's 7 a.m. and 3 p.m. during daylight time, or 6 a.m. and 2 p.m. in winter. Add four repo secrets: `APIFY_TOKEN`, `ANTHROPIC_API_KEY`, `SLACK_BOT_TOKEN` and `SLACK_CHANNEL`. You can also run any command by hand from the Actions tab.
 
 Both jobs live in one workflow with a concurrency lock, so they never overwrite each other's `state.json`. State lives in the Actions cache, the same pattern as maine-jet-tracker. If the cache is evicted, the next poll looks back `FIRST_LOOKBACK_HOURS` (24) and could repeat some posts. Nothing gets lost.
 
@@ -50,6 +50,10 @@ For cron on a droplet instead:
 */30 * * * * cd /path/to/maine-police-monitor && python3 monitor.py poll   >> monitor.log 2>&1
 0 7,15 * * * cd /path/to/maine-police-monitor && python3 monitor.py digest >> monitor.log 2>&1
 ```
+
+### The Slack app
+
+The bot's name, scopes (`chat:write`, `chat:write.public`) and description live in `manifest.json`. To change them, edit the file and run `slack manifest sync` (Slack CLI). Find the bot token at https://api.slack.com/apps/A0C5XJRVB1T/oauth.
 
 ## Cost
 

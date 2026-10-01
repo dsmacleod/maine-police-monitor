@@ -1,0 +1,20 @@
+{
+  "_metadata": {"major_version": 2, "minor_version": 1},
+  "display_information": {
+    "name": "Police Pages",
+    "description": "Summaries of new posts on Maine law-enforcement Facebook pages",
+    "long_description": "Posts urgent alerts and a twice-daily digest of new posts from Maine police, sheriff and state agency Facebook pages, triaged and summarized by Claude for BDN reporters. Source: github.com/dsmacleod/maine-police-monitor",
+    "background_color": "#1f3a5f"
+  },
+  "features": {
+    "bot_user": {"display_name": "Police Pages", "always_online": true}
+  },
+  "oauth_config": {
+    "scopes": {"bot": ["chat:write", "chat:write.public"]}
+  },
+  "settings": {
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
