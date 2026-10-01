@@ -2,7 +2,7 @@
 
 **Watches public Facebook pages of Maine police departments, sheriff's offices and state agencies, then has Claude triage and summarize each new post for a reporter in Slack.**
 
-Agencies often post news on Facebook first, sometimes only there: fatal crashes, manhunts, arrests, missing people, road closures. This tool checks those pages every 30 minutes and sorts each new post into one of three groups:
+Agencies often post news on Facebook first, sometimes only there: fatal crashes, manhunts, arrests, missing people, road closures. This tool checks those pages every 5 minutes and sorts each new post into one of three groups:
 
 - **Urgent** posts go to Slack right away. These are deaths, shootings, serious crashes, active searches, missing kids or vulnerable adults, lockdowns and major closures.
   > 🚨 **Urgent: crash** in Carmel
@@ -39,16 +39,17 @@ The starter list of 39 agencies uses **page URLs I guessed and haven't checked**
 
 ## Running it on a schedule
 
-`.github/workflows/monitor.yml` runs a **poll every 30 minutes** and a **digest at 11:00 and 19:00 UTC**. That's 7 a.m. and 3 p.m. during daylight time, or 6 a.m. and 2 p.m. in winter. Add four repo secrets: `APIFY_TOKEN`, `ANTHROPIC_API_KEY`, `SLACK_BOT_TOKEN` and `SLACK_CHANNEL`. You can also run any command by hand from the Actions tab.
+`.github/workflows/monitor.yml` runs `monitor.py poll` **every 5 minutes**, the GitHub Actions minimum. Each poll also sends the digest when one is due. Digests go out at **7 a.m. and 3 p.m. Eastern** all year (`DIGEST_HOURS_ET`). If a digest slot is missed by more than 3 hours, those items roll into the next digest. You can run `digest` or `check-pages` by hand from the Actions tab.
 
-Both jobs live in one workflow with a concurrency lock, so they never overwrite each other's `state.json`. State lives in the Actions cache, the same pattern as maine-jet-tracker. If the cache is evicted, the next poll looks back `FIRST_LOOKBACK_HOURS` (24) and could repeat some posts. Nothing gets lost.
+The repo is public, so Actions minutes are free; private repos would use up the monthly allowance. Keys are stored as repo secrets: `APIFY_TOKEN`, `ANTHROPIC_API_KEY`, `SLACK_BOT_TOKEN` and `SLACK_CHANNEL`. Run logs are public, but they contain only headlines from public posts.
 
-For cron on a droplet instead:
+**Lag:** a post usually reaches Slack 5–20 minutes after it goes up. GitHub often starts scheduled runs a few minutes late and sometimes skips one when it's busy. For tighter timing, run it from cron on a server:
 
 ```cron
-*/30 * * * * cd /path/to/maine-police-monitor && python3 monitor.py poll   >> monitor.log 2>&1
-0 7,15 * * * cd /path/to/maine-police-monitor && python3 monitor.py digest >> monitor.log 2>&1
+*/3 * * * * cd /path/to/maine-police-monitor && .venv/bin/python monitor.py poll >> monitor.log 2>&1
 ```
+
+State (seen post IDs and the digest queue) lives in the Actions cache. If the cache is evicted, the next poll looks back `FIRST_LOOKBACK_HOURS` (24) and could repeat some posts.
 
 ### The Slack app
 

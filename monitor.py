@@ -492,13 +492,35 @@ def cmd_check_pages(args):
     print(f"\n{bad} page(s) returned nothing or nothing in 30 days. Check those URLs in a browser and fix pages.json.")
 
 
+def digest_due(state):
+    """True if a digest slot (DIGEST_HOURS_ET, default 7 a.m. and 3 p.m. Eastern) has passed since the last digest."""
+    now = now_utc().astimezone(ET)
+    hours = sorted(int(h) for h in cfg("DIGEST_HOURS_ET", "7,15").split(","))
+    slots = [(now - timedelta(days=d)).replace(hour=h, minute=0, second=0, microsecond=0)
+             for d in (0, 1) for h in hours]
+    latest = max(s for s in slots if s <= now)
+    if now - latest > timedelta(hours=3):
+        return False  # missed the slot (outage); hold the queue for the next one rather than post at midnight
+    last = parse_time(state.get("last_digest"))
+    return last is None or last < latest
+
+
 def main():
     load_env()
     parser = argparse.ArgumentParser(description="Monitor Maine law-enforcement Facebook pages.")
     parser.add_argument("command", choices=["poll", "digest", "check-pages"])
     parser.add_argument("--dry-run", action="store_true", help="print Slack messages; don't post or save state")
     args = parser.parse_args()
-    {"poll": cmd_poll, "digest": cmd_digest, "check-pages": cmd_check_pages}[args.command](args)
+    if args.command == "poll":
+        # Every poll also sends the digest when one is due, so the schedule needs only one cron line
+        # and the digest stays at 7 and 3 Eastern across daylight-saving changes.
+        try:
+            cmd_poll(args)
+        finally:
+            if digest_due(load_state()):
+                cmd_digest(args)
+        return
+    {"digest": cmd_digest, "check-pages": cmd_check_pages}[args.command](args)
 
 
 if __name__ == "__main__":

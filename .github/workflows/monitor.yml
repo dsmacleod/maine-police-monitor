@@ -1,12 +1,11 @@
 name: maine-police-monitor
 
-# One workflow for both jobs so they share (and never race on) state.json.
-#   poll:   every 30 minutes, sends urgent alerts and queues everything else
-#   digest: 11:00 and 19:00 UTC, which is 7 a.m./3 p.m. EDT (6 a.m./2 p.m. EST)
+# Polls every 5 minutes (the Actions minimum): sends urgent alerts, queues everything else,
+# and sends the digest when one is due (7 a.m. and 3 p.m. Eastern; see DIGEST_HOURS_ET).
+# The concurrency group keeps runs from overlapping on state.json.
 on:
   schedule:
-    - cron: "*/30 * * * *"
-    - cron: "5 11,19 * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       command:
@@ -47,14 +46,7 @@ jobs:
           SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            CMD="${{ inputs.command }}"
-          elif [ "${{ github.event.schedule }}" = "5 11,19 * * *" ]; then
-            CMD=digest
-          else
-            CMD=poll
-          fi
-          python3 monitor.py "$CMD"
+          python3 monitor.py "${{ inputs.command || 'poll' }}"
 
       - name: Save state
         if: always()
