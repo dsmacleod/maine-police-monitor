@@ -460,6 +460,7 @@ def cmd_digest(args):
         lines.append(f"\n:warning: _Last successful poll was {fmt_et(parse_time(state['last_poll']))}. "
                      f"The poller may be broken._")
 
+    print(f"Sending digest: {len(urgent)} urgent, {len(notable)} notable, {sum(routine.values())} routine")
     post_chunked(lines, args.dry_run)
     if args.dry_run:
         print("(dry run: queue not cleared)")
