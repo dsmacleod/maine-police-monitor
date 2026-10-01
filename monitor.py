@@ -395,6 +395,8 @@ def cmd_poll(args):
     items = apify_scrape([p["url"] for p in pages], since.strftime("%Y-%m-%dT%H:%M:%S"),
                          int(cfg("POSTS_PER_PAGE", 10)))
 
+    # Apify returns {"error": "no_items"} for a page with nothing new since `since`. That's normal, not a failure.
+    items = [i for i in items if i.get("error") != "no_items"]
     errors = [i for i in items if i.get("error") or not (i.get("postId") or i.get("url"))]
     for e in errors:
         print(f"  page error: {e.get('url') or e.get('inputUrl')}: {e.get('error') or e.get('errorDescription')}")
