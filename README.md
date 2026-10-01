@@ -8,8 +8,7 @@ Agencies often post news on Facebook first, sometimes only there: fatal crashes,
   > 🚨 **Urgent: crash** in Carmel
   > • **Maine State Police**: Fatal crash closes I-95 northbound near Exit 174 ([post](#), Thu 6:12 a.m.)
   > A tractor-trailer and a car collided at about 5 a.m.; one person died. Northbound lanes are closed.
-  > _Follow up:_ Ask MSP for the victim's name and the crash cause.
-- **Notable** posts (arrests, drug seizures, fires, scam warnings, updates to earlier incidents) collect into a **digest at 7 a.m. and 3 p.m.**, with a summary, the people named and a suggested follow-up for each.
+- **Notable** posts (arrests, drug seizures, fires, scam warnings, updates to earlier incidents) collect into a **digest at 7 a.m. and 3 p.m.**, with a summary and the people named for each.
 - **Routine** posts (Coffee with a Cop, recruiting, birthdays, lost dogs) appear only as a one-line count per agency.
 
 Every summary comes from the agency's own post. **Confirm with the agency before publishing.**
