@@ -27,6 +27,7 @@ Env vars (put them in a .env file; see .env.example):
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -204,9 +205,11 @@ priority:
 serious injuries or a fatality, an active manhunt or search, a missing child or missing \
 vulnerable adult, a lockdown or shelter-in-place, a major highway closure, an officer-involved \
 shooting, or a large evacuation.
-- notable: worth a look in the next digest. Arrests and charges, drug seizures, crashes without \
-serious injury, fires, scam warnings with local specifics, policy changes, police-conduct issues, \
-updates to earlier incidents (suspect identified, missing person found, victim named).
+- notable: worth a look in the next digest. Arrests and charges (including arrest logs and lists), \
+drug seizures, crashes without serious injury, fires, scam warnings with local specifics, policy \
+changes, police-conduct issues, updates to earlier incidents (suspect identified, missing person \
+found, victim named). Also use notable for a post with no caption and no readable image: it may be \
+a press release the reporter needs to open (headline "Image-only post: open it").
 - routine: community events, recruiting and hiring, holiday or thank-you posts, officer \
 birthdays and retirements, lost pets, generic safety tips, reposts with no new information.
 
@@ -235,9 +238,26 @@ def build_post_block(p, include_image):
     body += "</post>"
     blocks = [{"type": "text", "text": body}]
     # Many agencies post press releases as images. If there's little text, show Claude the first photo.
+    # Facebook's robots.txt blocks Anthropic's URL fetcher, so download it ourselves and send base64.
     if include_image and len(text) + len(ocr) < 300 and p["photos"] and p["photos"][0]["uri"]:
-        blocks.append({"type": "image", "source": {"type": "url", "url": p["photos"][0]["uri"]}})
+        image = fetch_image(p["photos"][0]["uri"])
+        if image:
+            blocks.append({"type": "image", "source": {"type": "base64", **image}})
     return blocks
+
+
+def fetch_image(url, max_bytes=4_500_000):
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            media_type = resp.headers.get_content_type()
+            data = resp.read(max_bytes + 1)
+    except (urllib.error.URLError, TimeoutError) as e:
+        print(f"  couldn't download image ({e})")
+        return None
+    if media_type not in ("image/jpeg", "image/png", "image/gif", "image/webp") or len(data) > max_bytes:
+        return None
+    return {"media_type": media_type, "data": base64.b64encode(data).decode()}
 
 
 def triage(client, posts):
