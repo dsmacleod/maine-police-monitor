@@ -1,19 +1,19 @@
 {
-  "_note": "Page URLs are UNVERIFIED best guesses. Run `python3 monitor.py check-pages` and fix any NONE/STALE rows by finding the agency's real page in a browser.",
+  "_note": "URLs found via agency websites and search, 2026-10-01. Run `python3 monitor.py check-pages` after editing; out-of-state lookalike pages (e.g. Sanford FL, Franklin Co. VA) are a real risk.",
   "pages": [
     {
       "name": "Maine State Police",
-      "url": "https://www.facebook.com/MaineStatePolice",
+      "url": "https://www.facebook.com/MaineSP",
       "county": "statewide"
     },
     {
-      "name": "Maine Warden Service",
-      "url": "https://www.facebook.com/MaineWardenService",
+      "name": "Maine IF&W / Warden Service",
+      "url": "https://www.facebook.com/mefishwildlife",
       "county": "statewide"
     },
     {
       "name": "Maine Marine Patrol",
-      "url": "https://www.facebook.com/MaineMarinePatrol",
+      "url": "https://www.facebook.com/profile.php?id=544606922335736",
       "county": "statewide"
     },
     {
@@ -23,7 +23,7 @@
     },
     {
       "name": "Brewer Police Department",
-      "url": "https://www.facebook.com/BrewerPolice",
+      "url": "https://www.facebook.com/brewerpolicedepartment",
       "county": "Penobscot"
     },
     {
@@ -33,7 +33,7 @@
     },
     {
       "name": "Penobscot County Sheriff's Office",
-      "url": "https://www.facebook.com/PenobscotCountySheriff",
+      "url": "https://www.facebook.com/profile.php?id=100064916611336",
       "county": "Penobscot"
     },
     {
@@ -48,12 +48,12 @@
     },
     {
       "name": "Westbrook Police Department",
-      "url": "https://www.facebook.com/WestbrookPolice",
+      "url": "https://www.facebook.com/WestbrookPD",
       "county": "Cumberland"
     },
     {
       "name": "Cumberland County Sheriff's Office",
-      "url": "https://www.facebook.com/CumberlandCountySheriff",
+      "url": "https://www.facebook.com/cumberlandcountyso",
       "county": "Cumberland"
     },
     {
@@ -63,27 +63,27 @@
     },
     {
       "name": "Auburn Police Department",
-      "url": "https://www.facebook.com/AuburnMainePolice",
+      "url": "https://www.facebook.com/auburnpd",
       "county": "Androscoggin"
     },
     {
       "name": "Androscoggin County Sheriff's Office",
-      "url": "https://www.facebook.com/AndroscogginCountySheriff",
+      "url": "https://www.facebook.com/profile.php?id=100064499301811",
       "county": "Androscoggin"
     },
     {
       "name": "Augusta Police Department",
-      "url": "https://www.facebook.com/AugustaPolice",
+      "url": "https://www.facebook.com/AugustaMainePoliceDepartment",
       "county": "Kennebec"
     },
     {
       "name": "Waterville Police Department",
-      "url": "https://www.facebook.com/WatervillePolice",
+      "url": "https://www.facebook.com/waterville.police",
       "county": "Kennebec"
     },
     {
       "name": "Kennebec County Sheriff's Office",
-      "url": "https://www.facebook.com/KennebecCountySheriff",
+      "url": "https://www.facebook.com/KennebecCountySheriffsOffice",
       "county": "Kennebec"
     },
     {
@@ -93,47 +93,47 @@
     },
     {
       "name": "Saco Police Department",
-      "url": "https://www.facebook.com/SacoPolice",
+      "url": "https://www.facebook.com/SacoPD",
       "county": "York"
     },
     {
       "name": "Sanford Police Department",
-      "url": "https://www.facebook.com/SanfordPolice",
+      "url": "https://www.facebook.com/SanfordPD",
       "county": "York"
     },
     {
       "name": "York County Sheriff's Office",
-      "url": "https://www.facebook.com/YorkCountySheriff",
+      "url": "https://www.facebook.com/profile.php?id=61577888563031",
       "county": "York"
     },
     {
       "name": "Ellsworth Police Department",
-      "url": "https://www.facebook.com/EllsworthPolice",
+      "url": "https://www.facebook.com/ellsworthmainepolice",
       "county": "Hancock"
     },
     {
-      "name": "Bar Harbor Police Department",
-      "url": "https://www.facebook.com/BarHarborPolice",
+      "name": "Bar Harbor & Mount Desert Police Department",
+      "url": "https://www.facebook.com/profile.php?id=61555282019664",
       "county": "Hancock"
     },
     {
       "name": "Hancock County Sheriff's Office",
-      "url": "https://www.facebook.com/HancockCountySheriff",
+      "url": "https://www.facebook.com/HCSOMAINE",
       "county": "Hancock"
     },
     {
       "name": "Washington County Sheriff's Office",
-      "url": "https://www.facebook.com/WashingtonCountySheriffME",
+      "url": "https://www.facebook.com/profile.php?id=100093716956064",
       "county": "Washington"
     },
     {
       "name": "Aroostook County Sheriff's Office",
-      "url": "https://www.facebook.com/AroostookCountySheriff",
+      "url": "https://www.facebook.com/Aroostook.County.Sheriffs.Department",
       "county": "Aroostook"
     },
     {
       "name": "Presque Isle Police Department",
-      "url": "https://www.facebook.com/PresqueIslePolice",
+      "url": "https://www.facebook.com/PresqueislePD",
       "county": "Aroostook"
     },
     {
@@ -143,37 +143,32 @@
     },
     {
       "name": "Belfast Police Department",
-      "url": "https://www.facebook.com/BelfastPolice",
+      "url": "https://www.facebook.com/profile.php?id=100064874824824",
       "county": "Waldo"
     },
     {
       "name": "Waldo County Sheriff's Office",
-      "url": "https://www.facebook.com/WaldoCountySheriff",
+      "url": "https://www.facebook.com/profile.php?id=100064570728885",
       "county": "Waldo"
     },
     {
       "name": "Rockland Police Department",
-      "url": "https://www.facebook.com/RocklandPolice",
+      "url": "https://www.facebook.com/profile.php?id=100057668634806",
       "county": "Knox"
     },
     {
       "name": "Knox County Sheriff's Office",
-      "url": "https://www.facebook.com/KnoxCountySheriff",
+      "url": "https://www.facebook.com/knoxcountymaine",
       "county": "Knox"
     },
     {
       "name": "Lincoln County Sheriff's Office",
-      "url": "https://www.facebook.com/LincolnCountySheriff",
+      "url": "https://www.facebook.com/profile.php?id=189650190292",
       "county": "Lincoln"
     },
     {
-      "name": "Brunswick Police Department",
-      "url": "https://www.facebook.com/BrunswickPolice",
-      "county": "Cumberland"
-    },
-    {
       "name": "Bath Police Department",
-      "url": "https://www.facebook.com/BathPolice",
+      "url": "https://www.facebook.com/bathmainepd",
       "county": "Sagadahoc"
     },
     {
@@ -183,17 +178,17 @@
     },
     {
       "name": "Piscataquis County Sheriff's Office",
-      "url": "https://www.facebook.com/PiscataquisCountySheriff",
+      "url": "https://www.facebook.com/PiscataquisCountySheriffsOffice",
       "county": "Piscataquis"
     },
     {
       "name": "Franklin County Sheriff's Office",
-      "url": "https://www.facebook.com/FranklinCountySheriff",
+      "url": "https://www.facebook.com/franklincountysheriffmaine",
       "county": "Franklin"
     },
     {
       "name": "Oxford County Sheriff's Office",
-      "url": "https://www.facebook.com/OxfordCountySheriff",
+      "url": "https://www.facebook.com/oxfordcountymaine",
       "county": "Oxford"
     }
   ]

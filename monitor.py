@@ -30,6 +30,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -103,7 +104,16 @@ def fmt_et(dt):
 
 
 def norm_url(url):
-    return (url or "").lower().split("?")[0].rstrip("/").replace("://m.", "://www.").replace("://facebook.", "://www.facebook.")
+    """Canonical page URL for matching. Keeps the id for profile.php?id=... pages."""
+    base, _, query = (url or "").lower().partition("?")
+    base = base.rstrip("/").replace("://m.", "://www.").replace("://facebook.", "://www.facebook.")
+    if base.endswith("/profile.php"):
+        page_id = next((kv[3:] for kv in query.split("&") if kv.startswith("id=")), "")
+        return f"{base}?id={page_id}"
+    m = re.search(r"/p/[^/]*-(\d+)$", base)  # facebook.com/p/Some-Page-Name-100064916611336
+    if m:
+        return f"https://www.facebook.com/profile.php?id={m.group(1)}"
+    return base
 
 
 def load_pages():
@@ -470,7 +480,7 @@ def cmd_check_pages(args):
         t = latest[norm_url(p["url"])]
         status = "OK   " if t and t > stale else ("STALE" if t else "NONE ")
         bad += status != "OK   "
-        print(f"  {status} {p['name']:<40} {fmt_et(t) if t else '-':<16} {p['url']}")
+        print(f"  {status} {p['name']:<40} {t.astimezone(ET).strftime('%Y-%m-%d') if t else '-':<11} {p['url']}")
     print(f"\n{bad} page(s) returned nothing or nothing in 30 days. Check those URLs in a browser and fix pages.json.")
 
 
