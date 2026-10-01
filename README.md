@@ -23,8 +23,11 @@ Every summary comes from the agency's own post. **Confirm with the agency before
 
 ## Setup
 
+Needs Python 3.10+ (the Anthropic SDK requires it; macOS's built-in `python3` is 3.9).
+
 ```bash
-pip install -r requirements.txt
+uv venv -p 3.11 .venv && uv pip install -p .venv -r requirements.txt
+source .venv/bin/activate                  # then `python3` below is the venv's 3.11
 cp .env.example .env                       # add APIFY_TOKEN, ANTHROPIC_API_KEY, SLACK_WEBHOOK_URL
 python3 monitor.py check-pages             # find dead or wrong page URLs (costs ~8¢)
 python3 monitor.py poll --dry-run          # one poll, prints what it would post
