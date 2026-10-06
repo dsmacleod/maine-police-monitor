@@ -11,7 +11,8 @@ for a reporter, and posts to Slack:
     one-line tally of routine posts (community events, recruiting, etc.)
 
 Commands:
-  python3 monitor.py poll          fetch new posts, triage, send urgent alerts, queue the rest
+  python3 monitor.py poll          fetch new posts, triage, send urgent alerts, queue the rest (+ digest if due)
+  python3 monitor.py loop          poll every POLL_SECONDS until --minutes runs out (what GitHub Actions runs)
   python3 monitor.py digest        post the queued digest to Slack and clear the queue
   python3 monitor.py check-pages   fetch 1 post per page to find dead/wrong URLs in pages.json
   add --dry-run to any command to print instead of posting to Slack / saving state
@@ -23,6 +24,10 @@ Env vars (put them in a .env file; see .env.example):
   SLACK_CHANNEL       channel ID or #name to post to
   SLACK_WEBHOOK_URL   alternative to the bot token: an incoming-webhook URL
   FIRST_LOOKBACK_HOURS  How far back the very first poll looks (default 24)
+  LOOKBACK_MINUTES    Each poll re-checks at least this far back to catch posts a check missed (default 30)
+  POLL_SECONDS        Seconds between polls in `loop` mode (default 600)
+  APIFY_MAX_USD_PER_RUN  Most one Apify run may be charged (default 0.25)
+  APIFY_ACTOR         Apify actor (default alfalfa~facebook-posts-scraper)
   POSTS_PER_PAGE      Max posts fetched per page per poll (default 10)
 """
 
@@ -52,10 +57,13 @@ PAGES_FILE = ROOT / "pages.json"
 USER_AGENT = "maine-police-monitor/1.0 (Bangor Daily News)"
 ET = ZoneInfo("America/New_York")
 
-APIFY_ACTOR = "apify~facebook-posts-scraper"
+# alfalfa's scraper bills only for posts returned (an empty check is free); apify's own bills about $0.007 per page
+# per check. Set APIFY_ACTOR=apify~facebook-posts-scraper to fall back.
+APIFY_ACTOR = os.environ.get("APIFY_ACTOR", "alfalfa~facebook-posts-scraper")
 APIFY_BASE = "https://api.apify.com/v2"
 MODEL = "claude-opus-5-5"
-POLL_OVERLAP = timedelta(hours=1)   # re-ask for a little before the last poll; de-dupe catches repeats
+POLL_OVERLAP = timedelta(minutes=10)  # re-ask for a little before the last poll; de-dupe catches repeats
+MAX_CATCH_UP = timedelta(hours=24)     # after an outage, look back at most this far
 SEEN_TTL = timedelta(days=21)       # forget post IDs after this long
 CHUNK = 20                          # posts per Claude request
 
@@ -153,7 +161,9 @@ def apify_scrape(urls, newer_than, per_page):
     run_input = {"startUrls": [{"url": u} for u in urls], "resultsLimit": per_page}
     if newer_than:
         run_input["onlyPostsNewerThan"] = newer_than
-    run = http_json(f"{APIFY_BASE}/acts/{APIFY_ACTOR}/runs", run_input, auth)["data"]
+    # Hard cap on what one run can be charged (pay-per-event actors stop when they hit it).
+    max_usd = cfg("APIFY_MAX_USD_PER_RUN", "0.25")
+    run = http_json(f"{APIFY_BASE}/acts/{APIFY_ACTOR}/runs?maxTotalChargeUsd={max_usd}", run_input, auth)["data"]
     deadline = time.time() + 20 * 60
     while run["status"] in ("READY", "RUNNING"):
         if time.time() > deadline:
@@ -384,7 +394,13 @@ def cmd_poll(args):
     started = now_utc()
 
     last = parse_time(state.get("last_poll"))
-    since = (last - POLL_OVERLAP) if last else started - timedelta(hours=int(cfg("FIRST_LOOKBACK_HOURS", 24)))
+    # Each check occasionally misses a post, so always look back LOOKBACK_MINUTES (not just to the last poll):
+    # a post missed once is caught by a later check, and de-dupe by post ID drops the repeats.
+    lookback = started - timedelta(minutes=int(cfg("LOOKBACK_MINUTES", 30)))
+    if last:
+        since = max(min(lookback, last - POLL_OVERLAP), started - MAX_CATCH_UP)
+    else:
+        since = started - timedelta(hours=int(cfg("FIRST_LOOKBACK_HOURS", 24)))
     print(f"Polling {len(pages)} pages for posts since {fmt_et(since)} ET")
     items = apify_scrape([p["url"] for p in pages], since.strftime("%Y-%m-%dT%H:%M:%S"),
                          int(cfg("POSTS_PER_PAGE", 10)))
@@ -506,22 +522,43 @@ def digest_due(state):
     return last is None or last < latest
 
 
+def poll_and_maybe_digest(args):
+    # Every poll also sends the digest when one is due, so the digest stays at 7 and 3 Eastern
+    # across daylight-saving changes without its own schedule.
+    try:
+        cmd_poll(args)
+    finally:
+        if digest_due(load_state()):
+            cmd_digest(args)
+
+
+def cmd_loop(args):
+    """Poll every POLL_SECONDS for --minutes. GitHub's cron is too unreliable for 5-minute polling,
+    so Actions runs one long job that does its own timing and then starts its successor."""
+    interval = int(cfg("POLL_SECONDS", 600))
+    deadline = time.time() + args.minutes * 60
+    while True:
+        tick = time.time()
+        print(f"\n=== {fmt_et(now_utc())} ET ===", flush=True)
+        try:
+            poll_and_maybe_digest(args)
+        except Exception as e:  # keep looping through Apify/Claude/Slack hiccups
+            print(f"  poll failed: {type(e).__name__}: {e}", flush=True)
+        next_tick = tick + interval
+        if next_tick + 90 > deadline:  # leave room for one more poll to finish before the job ends
+            return
+        time.sleep(max(0, next_tick - time.time()))
+
+
 def main():
     load_env()
     parser = argparse.ArgumentParser(description="Monitor Maine law-enforcement Facebook pages.")
-    parser.add_argument("command", choices=["poll", "digest", "check-pages"])
+    parser.add_argument("command", choices=["poll", "loop", "digest", "check-pages"])
     parser.add_argument("--dry-run", action="store_true", help="print Slack messages; don't post or save state")
+    parser.add_argument("--minutes", type=int, default=330, help="loop: how long to keep polling")
     args = parser.parse_args()
-    if args.command == "poll":
-        # Every poll also sends the digest when one is due, so the schedule needs only one cron line
-        # and the digest stays at 7 and 3 Eastern across daylight-saving changes.
-        try:
-            cmd_poll(args)
-        finally:
-            if digest_due(load_state()):
-                cmd_digest(args)
-        return
-    {"digest": cmd_digest, "check-pages": cmd_check_pages}[args.command](args)
+    {"poll": poll_and_maybe_digest, "loop": cmd_loop, "digest": cmd_digest,
+     "check-pages": cmd_check_pages}[args.command](args)
 
 
 if __name__ == "__main__":

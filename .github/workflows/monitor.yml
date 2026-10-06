@@ -1,25 +1,31 @@
 name: maine-police-monitor
 
-# Polls every 5 minutes (the Actions minimum): sends urgent alerts, queues everything else,
-# and sends the digest when one is due (7 a.m. and 3 p.m. Eastern; see DIGEST_HOURS_ET).
-# The concurrency group keeps runs from overlapping on state.json.
+# GitHub's cron can't be trusted for 5-minute polling (it ran a */5 schedule ~4 times a day), so one job
+# runs `monitor.py loop`, polling every POLL_SECONDS for ~5.5 hours, then starts its own successor.
+# The hourly schedule is only a backstop in case a handoff fails; while a loop is running, the
+# concurrency group parks it as pending (at most one), and it starts when the current loop ends.
+# Each poll also sends the digest when one is due (7 a.m. and 3 p.m. Eastern).
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       command:
-        description: "poll, digest, or check-pages"
-        default: poll
+        description: "loop, poll, digest, or check-pages"
+        default: loop
 
 concurrency:
   group: maine-police-monitor
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  actions: write   # lets the loop start its successor with `gh workflow run`
+
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
 
@@ -45,8 +51,9 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          python3 monitor.py "${{ inputs.command || 'poll' }}"
+          POLL_SECONDS: "600"   # every 10 min: ~$4-5/mo on Apify (free plan caps at $5)
+          PYTHONUNBUFFERED: "1"
+        run: python3 monitor.py "${{ inputs.command || 'loop' }}" --minutes 330
 
       - name: Save state
         if: always()
@@ -54,3 +61,9 @@ jobs:
         with:
           path: state.json
           key: police-state-${{ github.run_id }}
+
+      - name: Start next loop
+        if: always() && (inputs.command || 'loop') == 'loop'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run monitor.yml --repo "${{ github.repository }}" -f command=loop

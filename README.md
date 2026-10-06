@@ -2,7 +2,7 @@
 
 **Watches public Facebook pages of Maine police departments, sheriff's offices and state agencies, then has Claude triage and summarize each new post for a reporter in Slack.**
 
-Agencies often post news on Facebook first, sometimes only there: fatal crashes, manhunts, arrests, missing people, road closures. This tool checks those pages every 5 minutes and sorts each new post into one of three groups:
+Agencies often post news on Facebook first, sometimes only there: fatal crashes, manhunts, arrests, missing people, road closures. This tool checks those pages every 10 minutes and sorts each new post into one of three groups:
 
 - **Urgent** posts go to Slack right away. These are deaths, shootings, serious crashes, active searches, missing kids or vulnerable adults, lockdowns and major closures.
   > 🚨 **Urgent: crash** in Carmel
@@ -15,7 +15,7 @@ Every summary comes from the agency's own post. **Confirm with the agency before
 
 ## How it works
 
-1. **Apify** ([Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper)) fetches only the posts made since the last poll from every page in `pages.json`. Apify, not our IP, deals with Facebook's login walls and blocking.
+1. **Apify** ([alfalfa/facebook-posts-scraper](https://apify.com/alfalfa/facebook-posts-scraper)) fetches recent posts from every page in `pages.json`. Each poll re-checks the last 30 minutes, because a single check occasionally misses a post. Posts already seen are skipped by ID. Apify, not our IP, deals with Facebook's login walls and blocking.
 2. **Claude** (`claude-opus-5-5`, low effort, structured output) triages them in batches. Apify also reads the text in images, which many agencies use for press releases. When a post has little text, Claude sees the first photo too.
 3. **Slack** gets the posts from the **Police Pages** bot (app `A0C5XJRVB1T`, defined in `manifest.json`). It needs `SLACK_BOT_TOKEN` and `SLACK_CHANNEL`. An incoming-webhook URL (`SLACK_WEBHOOK_URL`) also works instead.
 4. **`state.json`** tracks seen post IDs (so nothing is announced twice) and the digest queue.
@@ -33,21 +33,19 @@ python3 monitor.py poll --dry-run          # one poll, prints what it would post
 python3 monitor.py digest --dry-run        # prints the digest
 ```
 
-### ⚠️ Check `pages.json` first
+### Editing `pages.json`
 
-The starter list of 39 agencies uses **page URLs I guessed and haven't checked**. Run `check-pages`. For any row marked `NONE` or `STALE`, find the agency's real page in a browser and fix the URL. Add or remove agencies as needed. Each entry needs a `name` and a `url`.
+Each entry needs a `name` and a `url`. After any change, run `check-pages`, which costs about 7¢. Watch for out-of-state lookalike pages: `SanfordPolice` turned out to be Sanford, Florida, and `FranklinCountySheriff` was Virginia. Pages not monitored yet because no working URL was found: Auburn PD, Knox County Sheriff, Lincoln County Sheriff and Brunswick PD.
 
 ## Running it on a schedule
 
-`.github/workflows/monitor.yml` runs `monitor.py poll` **every 5 minutes**, the GitHub Actions minimum. Each poll also sends the digest when one is due. Digests go out at **7 a.m. and 3 p.m. Eastern** all year (`DIGEST_HOURS_ET`). If a digest slot is missed by more than 3 hours, those items roll into the next digest. You can run `digest` or `check-pages` by hand from the Actions tab.
+`.github/workflows/monitor.yml` runs **one long job**, `monitor.py loop`, that polls every **10 minutes** (`POLL_SECONDS`). After about 5½ hours it saves state and starts its own successor. GitHub's cron is too unreliable to use directly: a `*/5` schedule actually ran about 4 times a day. The hourly cron in the workflow is only a backstop that restarts the loop if a handoff fails.
 
-The repo is public, so Actions minutes are free; private repos would use up the monthly allowance. Keys are stored as repo secrets: `APIFY_TOKEN`, `ANTHROPIC_API_KEY`, `SLACK_BOT_TOKEN` and `SLACK_CHANNEL`. Run logs are public, but they contain only headlines from public posts.
+Each poll also sends the digest when one is due. Digests go out at **7 a.m. and 3 p.m. Eastern** all year (`DIGEST_HOURS_ET`). If a digest slot is missed by more than 3 hours, those items roll into the next digest. You can run `poll`, `digest` or `check-pages` by hand from the Actions tab. To stop everything, disable the workflow.
 
-**Lag:** a post usually reaches Slack 5–20 minutes after it goes up. GitHub often starts scheduled runs a few minutes late and sometimes skips one when it's busy. For tighter timing, run it from cron on a server:
+The repo is public, so Actions minutes are free; a private repo would burn through the monthly allowance with a job running around the clock. Keys are stored as repo secrets: `APIFY_TOKEN`, `ANTHROPIC_API_KEY`, `SLACK_BOT_TOKEN` and `SLACK_CHANNEL`. Run logs are public, but they contain only headlines from public posts.
 
-```cron
-*/3 * * * * cd /path/to/maine-police-monitor && .venv/bin/python monitor.py poll >> monitor.log 2>&1
-```
+**Lag:** an urgent post reaches Slack about 10 minutes after it goes up, on average 5. Lower `POLL_SECONDS` to poll more often (see Cost).
 
 State (seen post IDs and the digest queue) lives in the Actions cache. If the cache is evicted, the next poll looks back `FIRST_LOOKBACK_HOURS` (24) and could repeat some posts.
 
@@ -57,9 +55,14 @@ The bot's name, scopes (`chat:write`, `chat:write.public`) and description live 
 
 ## Cost
 
-- **Apify:** about $2 per 1,000 posts. Each poll asks only for posts since the last poll, so ~40 agencies posting a few times a day costs **roughly $5–10/month**.
-- **Claude:** the same posts in batches of 20 at low effort cost **a few dollars a month**.
-- Short polling intervals cost almost nothing extra, because Apify charges per post returned, not per run.
+Measured 2026-10-02, not estimated:
+
+- **Apify** bills **$0.002 per post returned**. A check that finds nothing costs **$0**, with no per-run or per-page fee. The bill depends on how many posts the agencies publish (about 15–20 a day across 35 pages) and on how often each post is re-returned within the 30-minute lookback, about 3 times at 10-minute polling. That's **about $4–5 a month**, inside Apify's free $5 credit. 5-minute polling is about $8–10 a month and needs a paid plan.
+- **Limits:**
+  - The free plan stops at $5 a month and can't bill more; runs simply fail until the 1st.
+  - Each run is capped at `APIFY_MAX_USD_PER_RUN` (25¢) on top of that.
+- **Don't switch back to `apify/facebook-posts-scraper` casually.** It bills about $0.007 per page on every check, even an empty one. That's about $0.25 per poll, or around $2,000 a month at 5-minute polling. It's kept only as a fallback (`APIFY_ACTOR=apify~facebook-posts-scraper`).
+- **Claude** triages new posts in batches at low effort, which costs **a few dollars a month**.
 
 ## Health checks
 
