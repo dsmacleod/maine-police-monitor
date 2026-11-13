@@ -64,6 +64,7 @@ APIFY_BASE = "https://api.apify.com/v2"
 MODEL = "claude-opus-5-5"
 POLL_OVERLAP = timedelta(minutes=10)  # re-ask for a little before the last poll; de-dupe catches repeats
 MAX_CATCH_UP = timedelta(hours=24)     # after an outage, look back at most this far
+OUTAGE_GAP = timedelta(hours=2)      # a poll this long after the last good one sends its posts immediately
 SEEN_TTL = timedelta(days=21)       # forget post IDs after this long
 CHUNK = 20                          # posts per Claude request
 
@@ -394,6 +395,7 @@ def cmd_poll(args):
     started = now_utc()
 
     last = parse_time(state.get("last_poll"))
+    recovering = last is not None and started - last > OUTAGE_GAP
     # Each check occasionally misses a post, so always look back LOOKBACK_MINUTES (not just to the last poll):
     # a post missed once is caught by a later check, and de-dupe by post ID drops the repeats.
     lookback = started - timedelta(minutes=int(cfg("LOOKBACK_MINUTES", 30)))
@@ -433,6 +435,11 @@ def cmd_poll(args):
             item["alerted"] = True
         queue.append(item)
         seen[p["id"]] = started.isoformat()
+
+    # After an outage, the catch-up poll's posts go out right away rather than waiting for the next digest slot.
+    if recovering and new:
+        print(f"  recovered from outage (last poll {fmt_et(last)}); catch-up digest due")
+        state["catch_up_due"] = True
 
     cutoff = started - SEEN_TTL
     state["seen"] = {k: v for k, v in seen.items() if parse_time(v) and parse_time(v) > cutoff}
@@ -483,6 +490,7 @@ def cmd_digest(args):
         return
     state["queue"] = []
     state["last_digest"] = now_utc().isoformat()
+    state.pop("catch_up_due", None)
     save_state(state)
 
 
@@ -510,14 +518,15 @@ def cmd_check_pages(args):
 
 
 def digest_due(state):
-    """True if a digest slot (DIGEST_HOURS_ET, default 7 a.m. and 3 p.m. Eastern) has passed since the last digest."""
+    """True if a catch-up is pending after an outage, or a digest slot (DIGEST_HOURS_ET, default 7 a.m. and
+    3 p.m. Eastern) has passed since the last digest. A slot missed during an outage is sent late, not skipped."""
+    if state.get("catch_up_due"):
+        return True
     now = now_utc().astimezone(ET)
     hours = sorted(int(h) for h in cfg("DIGEST_HOURS_ET", "7,15").split(","))
     slots = [(now - timedelta(days=d)).replace(hour=h, minute=0, second=0, microsecond=0)
              for d in (0, 1) for h in hours]
     latest = max(s for s in slots if s <= now)
-    if now - latest > timedelta(hours=3):
-        return False  # missed the slot (outage); hold the queue for the next one rather than post at midnight
     last = parse_time(state.get("last_digest"))
     return last is None or last < latest
 
